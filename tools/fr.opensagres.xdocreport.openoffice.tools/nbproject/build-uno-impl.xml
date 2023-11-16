@@ -12,7 +12,7 @@
 
     <target name="-uno-project-init" depends="-do-init">
         <property file="nbproject/project-uno.properties"/>
-        <property name="build.uno.version" value="2.0.4"/>
+        <property name="build.uno.version" value="2.0.4-ATP"/>
       
         <!-- set variablers from SDK and Office -->
         <echo message="setting up UNO environment ..."/>
