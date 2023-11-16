@@ -843,7 +843,7 @@ public class ElementVisitorForIText
         {
             currentContainer = newContainer;
             super.visit( ele );
-            if ( add )
+            if ( add && oldContainer != null )
             {
                 oldContainer.addElement( newContainer.getElement() );
             }
