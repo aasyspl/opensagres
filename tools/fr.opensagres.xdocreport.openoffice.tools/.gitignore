@@ -1,0 +1,7 @@
+/.settings
+/dist
+/build
+/miglayout-src.zip
+/lib
+/*.jar
+/META-INF/
