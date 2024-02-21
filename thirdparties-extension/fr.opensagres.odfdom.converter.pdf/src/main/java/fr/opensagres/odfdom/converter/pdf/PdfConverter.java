@@ -30,7 +30,6 @@ import java.io.OutputStream;
 import java.io.Writer;
 
 import fr.opensagres.xdocreport.utils.StringUtils;
-import org.apache.xerces.dom.TextImpl;
 import org.odftoolkit.odfdom.doc.OdfDocument;
 import org.odftoolkit.odfdom.dom.OdfContentDom;
 import org.odftoolkit.odfdom.dom.OdfStylesDom;
@@ -44,6 +43,7 @@ import fr.opensagres.odfdom.converter.core.ODFConverterException;
 import fr.opensagres.odfdom.converter.pdf.internal.ElementVisitorForIText;
 import fr.opensagres.odfdom.converter.pdf.internal.StyleEngineForIText;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 public class PdfConverter
@@ -153,20 +153,46 @@ public class PdfConverter
     }
 
     private void processHiddenParagraph(OdfElement contentRoot){
-        NodeList hiddenParagraphElementList = contentRoot.getElementsByTagName("text:hidden-paragraph");
-        for (int i = 0; i < hiddenParagraphElementList.getLength(); i++) {
-            TextHiddenParagraphElement item = (TextHiddenParagraphElement) hiddenParagraphElementList.item(i);
-            String conditionString = item.getTextConditionAttribute();
-            if(StringUtils.isNotEmpty(conditionString) && conditionString.contains("ooow:")){
-                conditionString = conditionString.replace("ooow:", "");
-                Boolean result = new SpelExpressionParser().parseExpression(conditionString).getValue(Boolean.class);
-                if(result){
-                    ((TextImpl)(item).getNextSibling()).removeData();
-                    item.getParentNode().removeChild(item);
-                }else{
-                    item.getParentNode().removeChild(item);
+        NodeList hiddenParagraphElementList;
+        do {
+            hiddenParagraphElementList = contentRoot.getElementsByTagName("text:hidden-paragraph");
+            if(hiddenParagraphElementList.getLength() > 0){
+                TextHiddenParagraphElement item = (TextHiddenParagraphElement)hiddenParagraphElementList.item(0);
+                String conditionString = item.getTextConditionAttribute();
+                if(StringUtils.isNotEmpty(conditionString) && conditionString.contains("ooow:")) {
+                    conditionString = conditionString.replace("ooow:", "");
+                    try {
+                        Boolean result = new SpelExpressionParser().parseExpression(conditionString).getValue(Boolean.class);
+                        if (result.booleanValue()) {
+                            //find the tag and remove all because tag should be hidden
+                            Node parentNode = findParentByTagName(item, "text:p");
+                            if(parentNode != null){
+                                parentNode.setTextContent("");
+                                parentNode.getParentNode().removeChild(parentNode);
+                            }
+                        } else {
+                            //remove only hidden tag
+                            item.getParentNode().removeChild(item);
+                        }
+                    }catch(Exception e)
+                    {
+                        item.setNodeValue(conditionString + e.getMessage() + e.getStackTrace());
+                    }
                 }
+
             }
+        }while(hiddenParagraphElementList != null && hiddenParagraphElementList.getLength() > 0);
+
+    }
+
+    private Node findParentByTagName(Node item, String tagName){
+        if(item == null){
+            return item;
         }
+        Node parentNode = item.getParentNode();
+        while(parentNode != null && !parentNode.getNodeName().equalsIgnoreCase(tagName))  {
+            parentNode = parentNode.getParentNode();
+        }
+        return parentNode;
     }
 }
