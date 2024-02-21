@@ -28,13 +28,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import fr.opensagres.xdocreport.utils.StringUtils;
 import org.apache.xerces.dom.TextImpl;
 import org.odftoolkit.odfdom.doc.OdfDocument;
 import org.odftoolkit.odfdom.dom.OdfContentDom;
 import org.odftoolkit.odfdom.dom.OdfStylesDom;
+import org.odftoolkit.odfdom.dom.element.text.TextConditionalTextElement;
 import org.odftoolkit.odfdom.dom.element.text.TextHiddenParagraphElement;
+import org.odftoolkit.odfdom.dom.element.text.TextHiddenTextElement;
 import org.odftoolkit.odfdom.incubator.doc.office.OdfOfficeMasterStyles;
 import org.odftoolkit.odfdom.pkg.OdfElement;
 
@@ -152,6 +156,64 @@ public class PdfConverter
 
     private void processHiddenElements(OdfElement contentRoot) {
         processHiddenParagraph(contentRoot);
+        processConditionalText(contentRoot);
+        processHiddenText(contentRoot);
+    }
+
+    private void processConditionalText(OdfElement contentRoot) {
+        NodeList conditionalNodeList;
+        do {
+            conditionalNodeList = contentRoot.getElementsByTagName("text:conditional-text");
+            if(conditionalNodeList.getLength()>0){
+                TextConditionalTextElement item = (TextConditionalTextElement) conditionalNodeList.item(0);
+                String conditionString = item.getTextConditionAttribute();
+                if(StringUtils.isNotEmpty(conditionString) && conditionString.contains("ooow:")){
+                    conditionString = conditionString.replace("ooow:", "");
+                    try{
+                        Boolean result = new SpelExpressionParser().parseExpression(conditionString).getValue(Boolean.class);
+                        if(result.booleanValue()){
+                            item.getParentNode().setTextContent(item.getTextStringValueIfTrueAttribute());
+                        }else{
+                            item.getParentNode().setTextContent(item.getTextStringValueIfFalseAttribute());
+                        }
+                        if(item.getParentNode() != null)
+                            item.getParentNode().removeChild(item);
+                    }catch (Exception e){
+                        Logger.getLogger(this.toString()).log(Level.WARNING, e.getMessage(), e.getStackTrace());
+                        if(item.getParentNode() != null)
+                            item.getParentNode().removeChild(item);
+                    }
+                }
+            }
+        }while(conditionalNodeList != null && conditionalNodeList.getLength() > 0);
+    }
+
+    private void processHiddenText(OdfElement contentRoot) {
+        NodeList hiddenTextNodeList;
+        do {
+            hiddenTextNodeList = contentRoot.getElementsByTagName("text:hidden-text");
+            if(hiddenTextNodeList.getLength()>0){
+                TextHiddenTextElement item = (TextHiddenTextElement) hiddenTextNodeList.item(0);
+                String conditionString = item.getTextConditionAttribute();
+                if(StringUtils.isNotEmpty(conditionString) && conditionString.contains("ooow:")){
+                    conditionString = conditionString.replace("ooow:", "");
+                    try{
+                        Boolean result = new SpelExpressionParser().parseExpression(conditionString).getValue(Boolean.class);
+                        if(result.booleanValue()){
+                            item.getParentNode().setTextContent(item.getTextStringValueAttribute());
+                        }else{
+                            item.getParentNode().setTextContent("");
+                        }
+                        if(item.getParentNode() != null)
+                            item.getParentNode().removeChild(item);
+                    }catch (Exception e){
+                        Logger.getLogger(this.toString()).log(Level.WARNING, e.getMessage(), e.getStackTrace());
+                        if(item.getParentNode() != null)
+                            item.getParentNode().removeChild(item);
+                    }
+                }
+            }
+        }while(hiddenTextNodeList != null && hiddenTextNodeList.getLength() > 0);
     }
 
     private void processHiddenParagraph(OdfElement contentRoot){
@@ -178,7 +240,9 @@ public class PdfConverter
                         }
                     }catch(Exception e)
                     {
-                        item.setNodeValue(conditionString + e.getMessage() + e.getStackTrace());
+                        Logger.getLogger(this.toString()).log(Level.WARNING, e.getMessage(), e.getStackTrace());
+                        if(item.getParentNode() != null)
+                            item.getParentNode().removeChild(item);
                     }
                 }
 
